@@ -763,6 +763,18 @@ check_variant2()
 			pstatus yellow UNKNOWN "couldn't read your kernel configuration"
 		fi
 
+		_info_nol "*   Retpoline enabled: "
+		if [ "$opt_live" = 1 ]; then
+			if grep -qw retpoline /proc/cpuinfo; then
+				pstatus green YES
+				retpoline_enabled=1
+			else
+				pstatus red NO
+			fi
+		else
+			pstatus blue N/A "can't check this in offline mode"
+		fi
+
 		_info_nol "*   Kernel compiled with a retpoline-aware compiler: "
 		# Now check if the compiler used to compile the kernel knows how to insert retpolines in generated asm
 		# For gcc, this is -mindirect-branch=thunk-extern (detected by the kernel makefiles)
@@ -801,28 +813,31 @@ check_variant2()
 	fi
 
 	# if we have the /sys interface, don't even check is_cpu_vulnerable ourselves, the kernel already does it
+	cve='CVE-2017-5715'
 	if [ "$sys_interface_available" = 0 ] && ! is_cpu_vulnerable 2; then
 		# override status & msg in case CPU is not vulnerable after all
-		pvulnstatus CVE-2017-5715 OK "your CPU vendor reported your CPU model as not vulnerable"
+		pvulnstatus $cve OK "your CPU vendor reported your CPU model as not vulnerable"
 	elif [ -z "$msg" ]; then
 		# if msg is empty, sysfs check didn't fill it, rely on our own test
-		if [ "$retpoline" = 1 -a "$retpoline_compiler" = 1 ]; then
-			pvulnstatus CVE-2017-5715 OK "retpoline mitigate the vulnerability"
-		elif [ "$opt_live" = 1 ]; then
+		if [ "$opt_live" = 1 ]; then
 			if [ "$ibrs_enabled" = 1 -o "$ibrs_enabled" = 2 ]; then
-				pvulnstatus CVE-2017-5715 OK "IBRS mitigates the vulnerability"
+				pvulnstatus $cve OK "IBRS mitigates the vulnerability"
+			elif [ "$retpoline" = 1 -a "$retpoline_compiler" = 1 -a "$retpoline_enabled" = 1 ]; then
+				pvulnstatus $cve OK "retpoline mitigates the vulnerability"
 			else
-				pvulnstatus CVE-2017-5715 VULN "IBRS hardware + kernel support OR kernel with retpoline are needed to mitigate the vulnerability"
+				pvulnstatus $cve VULN "IBRS hardware + kernel support OR kernel with retpoline enabled are needed to mitigate the vulnerability"
 			fi
 		else
 			if [ "$ibrs_supported" = 1 ]; then
-				pvulnstatus CVE-2017-5715 OK "offline mode: IBRS will mitigate the vulnerability if enabled at runtime"
+				pvulnstatus $cve OK "offline mode: IBRS will mitigate the vulnerability if enabled at runtime"
+			elif [ "$retpoline" = 1 -a "$retpoline_compiler" = 1 ]; then
+				pvulnstatus $cve OK "offline mode: retpoline will mitigate the vulnerability"
 			else
-				pvulnstatus CVE-2017-5715 VULN "IBRS hardware + kernel support OR kernel with retpoline are needed to mitigate the vulnerability"
+				pvulnstatus $cve VULN "IBRS hardware + kernel support OR kernel with retpoline are needed to mitigate the vulnerability"
 			fi
 		fi
 	else
-		pvulnstatus CVE-2017-5715 "$status" "$msg"
+		pvulnstatus $cve "$status" "$msg"
 	fi
 }
 
