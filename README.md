@@ -43,3 +43,44 @@ Your system exposure also depends on your CPU. As of now, AMD and ARM processors
 The nature of the discovered vulnerabilities being quite new, the landscape of vulnerable processors can be expected to change over time, which is why this script makes the assumption that all CPUs are vulnerable, except if the manufacturer explicitly stated otherwise in a verifiable public announcement.
 
 This tool has been released in the hope that it'll be useful, but don't use it to jump to conclusions about your security.
+
+## Controlling the Performance Impact of Microcode and Security Patches    
+   
+* Persistently disable - Effective across a reboot   
+   
+The first option is to disable them via the kernel command line by adding these flags, then reboot the kernel to have them take effect:   
+   
+```   
+[root@node ~]$cat /etc/default/grub    
+GRUB_CMDLINE_LINUX="crashkernel=auto rd.md.uuid=00f5a41e:86a83763:655f8331:092cd656 rhgb quiet noibrs nopti noibpb"   
+[root@node ~]$grub2-mkconfig -o /boot/grub2/grub.cfg   
+[root@node ~]$reboot   
+```   
+
+   
+* Runtime disable - Does not persist through a reboot   
+   
+The second option is to disable them at runtime with the following three commands. The change is immediately active and does not require a reboot.   
+   
+```   
+[root@node ~]$echo 0 > /sys/kernel/debug/x86/pti_enabled   
+[root@node ~]$echo 0 > /sys/kernel/debug/x86/ibpb_enabled   
+[root@node ~]$echo 0 > /sys/kernel/debug/x86/ibrs_enabled   
+```   
+   
+Note this requires that the debugfs filesystem be mounted. In RHEL 7 the debugfs is mounted by default. In RHEL 6 you can mount it manually with   
+   
+```   
+[root@node ~]$mount |grep debugfs   
+[root@node ~]$mount -t debugfs nodev /sys/kernel/debug   
+```   
+   
+* Verifying changes   
+   
+To verify the fixes for these CVEs are correctly disabled, cat the following three files to verify their values are all set to 0.   
+   
+```   
+[root@node ~]$cat /sys/kernel/debug/x86/pti_enabled   
+[root@node ~]$cat /sys/kernel/debug/x86/ibpb_enabled   
+[root@node ~]$cat /sys/kernel/debug/x86/ibrs_enabled   
+```   
